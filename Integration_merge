@@ -1,0 +1,57 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Sep  5 10:12:44 2017
+
+@author: JZ, TS
+"""
+
+import numpy as np
+import glob
+import re
+
+#--------Liste um Daten zusammenzubringen--------------------------------------
+all_data = []
+#leere Liste wird erstellt
+for filename in glob.glob('*.txt'):
+#alle txt Files im Ordner werden geöffnet
+    with open(filename, 'r') as in_file:
+        compound_name = filename.split('_')[1]
+        # der Komponentenname wird aus dem txt File ausgeschnitten (an zweiter Position) 
+        if re.search('[a-zA-Z]', compound_name) and filename != 'all_data.txt':
+        #re=regular expression, gibt an wie strings durchsucht werden
+            stripped = (line.strip() for line in in_file)
+            # keine Variable, GENERATOR OBJEKT
+            lines = [[line.split("\t")[0],
+                      line.split("\t")[6]]
+                     for line in stripped if line][1:]
+                     #listcomprahension ....... [1:] slicing= alles ab dem ersten eintrag nehmen   
+            all_data.append([compound_name, lines])
+            #der part wird hinten angehängt, dann fängt die schleife erneut an
+        in_file.close()
+        #dann gehts weiter mit for filename bis schleife vorbei
+        
+        
+#--------Datensatz wird formatiert---------------------------------------------        
+deconv = [[0 for i in np.arange(len(all_data)+1)] for a in np.arange(np.shape(all_data[0][1])[0]+1)]
+#deconv ist eine neue Liste von 0en mit der Form shape
+for measurement_number, data in enumerate(deconv[1:]):
+    #ab dem zweiten Element in der Leeren Liste mit den Namen der Messungen aufgefüllt
+    deconv[measurement_number+1][0] = all_data[0][1][measurement_number][0]
+for index, element  in enumerate(all_data):
+    deconv[0][index+1] = element[0]
+    #Name der Verbindung wird eingefügt
+    for measurement_number, data in enumerate(element[1]):
+        #Schleife bringt die Daten aller Messungen einer Verbindung in die Liste
+        if data[1] == 'NaN':
+            number = 0
+        else:
+            number = np.float(data[1])
+        deconv[measurement_number+1][index+1] = number
+        #springt dann eins weiter und fängt von vorne an
+with open('all_data.txt', 'w') as out_file:
+    for entry in deconv:
+        for line in entry:
+            out_file.writelines(str(line)+'\t')
+        out_file.writelines('\n')#\n bedeutet new line
+    out_file.close()
+#------------------------------------------------------------------------------ 
