@@ -1,0 +1,59 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Oct 12 18:48:09 2017
+
+@author: J. Zeuschner
+"""
+
+import pandas as pd
+from datetime import datetime as dt
+import numpy as np
+import glob
+import os
+import re
+
+
+log_files = glob.glob('*.log') 
+#glob.glob() gibt eine Liste aus
+print('all log files', log_files)
+
+''' constants ''' #Konstanten und Funktionen muss man nur einmal definieren, in der Schleife wird die Funktion ständig neu definiert, was nicht sehr effizient ist
+minTime, maxTime = '00:25:00', '00:45:05' #time limits
+
+''' functions '''
+def FlowSelect(log, first_line = 0): #generator function ('yield'!)
+    last_time = dt.strptime('00:00:00', '%H:%M:%S')
+    for entry in log.iterrows():
+        # liest den generator aus log.iterrows()), Zeile für Zeile
+        time = dt.strptime(entry[1]['ProcTime'], '%H:%M:%S')
+        #Zeit aus der Zeile lesen
+        if time < last_time: #Vergleich der Zeiten der letzten beiden Zeilen
+            bool_select = ((log[first_line:entry[0]]['ProcTime'] > minTime) &
+                           (log[first_line:entry[0]]['ProcTime'] < maxTime))
+            #Leserahmen aus [first_line:entry[0]], dem Index der ersten
+            #Zeile des aktuellen Datensatzes und der jetzigen Zeile
+            yield (log[first_line:entry[0]]['FlowSample'][bool_select])
+            first_line = entry[0] #index der ersten Zeile des neuen Datensatzes
+        last_time = time #Index der aktuellen Zeile wird Index der letzten Zeile
+
+def all_files(directory):
+    for path, dirs, files in os.walk(directory):
+        for file_name in files:
+            yield os.path.join(path, file_name)
+#folder tree crawler, credit goes to Fred Foo auf  https://stackoverflow.com/questions/8505457/how-to-crawl-folders-to-index-files
+
+
+''' program '''
+your_directory = os.curdir
+log_files = [log_f for log_f in all_files(your_directory)
+             if re.search(r'\.log$', log_f, re.IGNORECASE)] #re.search sucht nach '.log' am Ende des Strings ('$') und ignoriert dabei, ob die Datei auf .log oder auf .LOG endet
+print(log_files)
+for file_name in log_files:
+    log = pd.read_csv(file_name, delimiter='\t', header = 0) #data file
+    volumes = [round(x.sum()*5/60, 3) for x in (FlowSelect(log))] 
+    np.savetxt(os.path.split(file_name)[-1]+'.txt', volumes) #np.savetxt() funktioniert auch mit Listen, muss nicht erst in np.array umgewandelt werden
+    #der crawler spuckt einen Pfad als Dateinamen aus. Wenn die .txt nicht im Ordner des .log-files gespeichert werden soll, sondern wo das .py file ist, muss man den Pfad abspalten
+    print(volumes)
+
+    
+print('finish')
